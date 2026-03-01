@@ -158,20 +158,23 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
         sug_cli = []
         obj = str(clinica.iloc[0]["objetivo_clinico"]).lower()
         hist = str(clinica.iloc[0]["historico_doencas"]).lower()
-        if 'emagrec' in obj or 'perder' in obj:
+        
+        if 'emagrec' in obj or 'perder' in obj or 'peso' in obj:
             sug_cli.append("- [IA Clínica] Foco em déficit calórico e saciedade via fibras.")
-        if 'diabetes' in obj or 'glicose' in obj:
+        elif 'diabetes' in obj or 'glicose' in obj:
             sug_cli.append("- [IA Clínica] Controle de carga glicêmica em todas as refeições.")
+        else:
+            sug_cli.append("- [IA Clínica] Manter constância no plano alimentar para equilíbrio metabólico.")
+            
         if 'cansaço' in hist or 'fadiga' in hist:
             sug_cli.append("- [IA Clínica] Avaliar deficiência de B12/Ferro e aporte hídrico.")
         
-        if sug_cli:
-            pdf.set_font('helvetica', 'I', 10)
-            pdf.set_text_color(40, 40, 150)
-            for s in sug_cli:
-                pdf.multi_cell(0, 7, s)
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('helvetica', '', 12)
+        pdf.set_font('helvetica', 'I', 10)
+        pdf.set_text_color(40, 40, 150)
+        for s in sug_cli:
+            pdf.multi_cell(0, 7, s)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('helvetica', '', 12)
         pdf.ln(5)
 
     if not esportiva.empty:
@@ -185,20 +188,22 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
         sug_esp = []
         obj_e = str(esportiva.iloc[0]["objetivo_esportivo"]).lower()
         sup = str(esportiva.iloc[0]["suplementos"]).lower()
-        if 'hipertrofia' in obj_e or 'massa' in obj_e:
+        
+        if 'hipertrofia' in obj_e or 'massa' in obj_e or 'músculo' in obj_e:
             sug_esp.append("- [IA Esportiva] Proteína ideal: 2.0-2.2g/kg distribuída em 4-5 doses.")
             if 'creatina' not in sup:
                 sug_esp.append("- [IA Esportiva] Info: Avaliar introdução de Creatina para performance.")
-        if 'performance' in obj_e or 'rendimento' in obj_e:
+        elif 'performance' in obj_e or 'rendimento' in obj_e or 'treino' in obj_e:
             sug_esp.append("- [IA Esportiva] Periodização de carboidratos conforme carga de treino.")
+        else:
+            sug_esp.append("- [IA Esportiva] Ajustar aporte energético para suprir a demanda da atividade física.")
             
-        if sug_esp:
-            pdf.set_font('helvetica', 'I', 10)
-            pdf.set_text_color(40, 110, 40)
-            for s in sug_esp:
-                pdf.multi_cell(0, 7, s)
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('helvetica', '', 12)
+        pdf.set_font('helvetica', 'I', 10)
+        pdf.set_text_color(40, 110, 40)
+        for s in sug_esp:
+            pdf.multi_cell(0, 7, s)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('helvetica', '', 12)
         pdf.ln(5)
 
     if not infantil.empty:
@@ -212,18 +217,20 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
         # IA Infantil
         sug_inf = []
         obj_i = str(infantil.iloc[0]["objetivo_infantil"]).lower()
-        if 'introdução' in obj_i or 'comer' in obj_i:
+        
+        if 'introdução' in obj_i or 'comer' in obj_i or 'alimento' in obj_i:
             sug_inf.append("- [IA Infantil] Estímulo sensorial: variedade de cores e texturas naturais.")
-        if 'crescer' in obj_i or 'peso' in obj_i:
+        elif 'crescer' in obj_i or 'peso' in obj_i:
             sug_inf.append("- [IA Infantil] Atenção ao aporte de micronutrientes e gorduras saudáveis.")
+        else:
+            sug_inf.append("- [IA Infantil] Fomentar hábitos saudáveis e variedade alimentar lúdica.")
 
-        if sug_inf:
-            pdf.set_font('helvetica', 'I', 10)
-            pdf.set_text_color(150, 40, 40)
-            for s in sug_inf:
-                pdf.multi_cell(0, 7, s)
-            pdf.set_text_color(0, 0, 0)
-            pdf.set_font('helvetica', '', 12)
+        pdf.set_font('helvetica', 'I', 10)
+        pdf.set_text_color(150, 40, 40)
+        for s in sug_inf:
+            pdf.multi_cell(0, 7, s)
+        pdf.set_text_color(0, 0, 0)
+        pdf.set_font('helvetica', '', 12)
         pdf.ln(5)
 
     return bytes(pdf.output())
