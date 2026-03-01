@@ -1,0 +1,314 @@
+import streamlit as st
+import sqlite3
+import pandas as pd
+from fpdf import FPDF
+import datetime
+import os
+
+def inicializar_banco():
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS pacientes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        idade INTEGER,
+        sexo TEXT,
+        peso REAL,
+        altura REAL,
+        imc REAL
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS clinica (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER,
+        historico_doencas TEXT,
+        alergias TEXT,
+        medicamentos TEXT,
+        objetivo_clinico TEXT,
+        FOREIGN KEY (paciente_id) REFERENCES pacientes (id)
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS esportiva (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER,
+        esporte TEXT,
+        frequencia TEXT,
+        suplementos TEXT,
+        objetivo_esportivo TEXT,
+        FOREIGN KEY (paciente_id) REFERENCES pacientes (id)
+    )
+    ''')
+    
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS infantil (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        paciente_id INTEGER,
+        idade_gestacional TEXT,
+        amamentacao TEXT,
+        introducao_alimentar TEXT,
+        objetivo_infantil TEXT,
+        FOREIGN KEY (paciente_id) REFERENCES pacientes (id)
+    )
+    ''')
+    
+    conexao.commit()
+    conexao.close()
+
+def salvar_paciente(nome, idade, sexo, peso, altura, imc):
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    cursor.execute('INSERT INTO pacientes (nome, idade, sexo, peso, altura, imc) VALUES (?, ?, ?, ?, ?, ?)',
+                   (nome, idade, sexo, peso, altura, imc))
+    paciente_id = cursor.lastrowid
+    conexao.commit()
+    conexao.close()
+    return paciente_id
+
+def salvar_clinica(paciente_id, historico, alergias, medicamentos, objetivo):
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    cursor.execute('DELETE FROM clinica WHERE paciente_id = ?', (paciente_id,))
+    cursor.execute('INSERT INTO clinica (paciente_id, historico_doencas, alergias, medicamentos, objetivo_clinico) VALUES (?, ?, ?, ?, ?)',
+                   (paciente_id, historico, alergias, medicamentos, objetivo))
+    conexao.commit()
+    conexao.close()
+
+def salvar_esportiva(paciente_id, esporte, frequencia, suplementos, objetivo):
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    cursor.execute('DELETE FROM esportiva WHERE paciente_id = ?', (paciente_id,))
+    cursor.execute('INSERT INTO esportiva (paciente_id, esporte, frequencia, suplementos, objetivo_esportivo) VALUES (?, ?, ?, ?, ?)',
+                   (paciente_id, esporte, frequencia, suplementos, objetivo))
+    conexao.commit()
+    conexao.close()
+
+def salvar_infantil(paciente_id, gestacao, amamentacao, introducao, objetivo):
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    cursor.execute('DELETE FROM infantil WHERE paciente_id = ?', (paciente_id,))
+    cursor.execute('INSERT INTO infantil (paciente_id, idade_gestacional, amamentacao, introducao_alimentar, objetivo_infantil) VALUES (?, ?, ?, ?, ?)',
+                   (paciente_id, gestacao, amamentacao, introducao, objetivo))
+    conexao.commit()
+    conexao.close()
+
+def listar_pacientes():
+    conexao = sqlite3.connect('nutricao.db')
+    df = pd.read_sql_query('SELECT * FROM pacientes', conexao)
+    conexao.close()
+    return df
+
+def excluir_paciente(id_paciente):
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    cursor.execute('DELETE FROM clinica WHERE paciente_id = ?', (id_paciente,))
+    cursor.execute('DELETE FROM esportiva WHERE paciente_id = ?', (id_paciente,))
+    cursor.execute('DELETE FROM infantil WHERE paciente_id = ?', (id_paciente,))
+    cursor.execute('DELETE FROM pacientes WHERE id = ?', (id_paciente,))
+    conexao.commit()
+    conexao.close()
+
+def obter_dados_relatorio(id_paciente):
+    conexao = sqlite3.connect('nutricao.db')
+    paciente = pd.read_sql_query(f'SELECT * FROM pacientes WHERE id = {id_paciente}', conexao).iloc[0]
+    clinica = pd.read_sql_query(f'SELECT * FROM clinica WHERE paciente_id = {id_paciente}', conexao)
+    esportiva = pd.read_sql_query(f'SELECT * FROM esportiva WHERE paciente_id = {id_paciente}', conexao)
+    infantil = pd.read_sql_query(f'SELECT * FROM infantil WHERE paciente_id = {id_paciente}', conexao)
+    conexao.close()
+    return paciente, clinica, esportiva, infantil
+
+class PDF(FPDF):
+    def header(self):
+        if os.path.exists("logo.png"):
+            self.image("logo.png", 10, 8, 33)
+        self.set_font('helvetica', 'B', 20)
+        self.cell(80)
+        self.cell(30, 10, 'Relatório Nutricional', 0, 1, 'C')
+        self.ln(20)
+
+def gerar_pdf(paciente, clinica, esportiva, infantil):
+    pdf = PDF()
+    pdf.add_page()
+    pdf.set_font('helvetica', '', 12)
+    
+    pdf.set_fill_color(220, 235, 255)
+    pdf.cell(0, 10, 'Dados Básicos do Paciente', 0, 1, 'L', 1)
+    pdf.cell(0, 10, f'Nome: {paciente["nome"]}', 0, 1)
+    pdf.cell(0, 10, f'Idade: {paciente["idade"]} anos | Sexo: {paciente["sexo"]}', 0, 1)
+    pdf.cell(0, 10, f'Peso: {paciente["peso"]}kg | Altura: {paciente["altura"]}m', 0, 1)
+    pdf.cell(0, 10, f'IMC: {paciente["imc"]:.2f}', 0, 1)
+    pdf.ln(5)
+
+    sugestoes = []
+    
+    if not clinica.empty:
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(0, 10, 'Avaliação Clínica', 0, 1, 'L', 1)
+        pdf.multi_cell(0, 10, f'Histórico: {clinica.iloc[0]["historico_doencas"]}')
+        pdf.multi_cell(0, 10, f'Alergias: {clinica.iloc[0]["alergias"]}')
+        pdf.multi_cell(0, 10, f'Medicamentos: {clinica.iloc[0]["medicamentos"]}')
+        pdf.multi_cell(0, 10, f'Objetivo: {clinica.iloc[0]["objetivo_clinico"]}')
+        pdf.ln(5)
+        
+        obj = str(clinica.iloc[0]["objetivo_clinico"]).lower()
+        if 'emagrec' in obj or 'perder peso' in obj:
+            sugestoes.append("- Foco em déficit calórico controlado e aumento de ingestão de fibras.")
+        if 'diabetes' in obj or 'glicose' in obj:
+            sugestoes.append("- Controle rigoroso de carga glicêmica e monitoramento de carboidratos complexos.")
+
+    if not esportiva.empty:
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(0, 10, 'Avaliação Esportiva', 0, 1, 'L', 1)
+        pdf.multi_cell(0, 10, f'Atividade: {esportiva.iloc[0]["esporte"]} ({esportiva.iloc[0]["frequencia"]})')
+        pdf.multi_cell(0, 10, f'Suplementação: {esportiva.iloc[0]["suplementos"]}')
+        pdf.multi_cell(0, 10, f'Objetivo Esportivo: {esportiva.iloc[0]["objetivo_esportivo"]}')
+        
+        obj_e = str(esportiva.iloc[0]["objetivo_esportivo"]).lower()
+        if 'hipertrofia' in obj_e or 'ganho de massa' in obj_e:
+            sugestoes.append("- Otimizar aporte proteico distribuído ao longo do dia (2.0g/kg+).")
+            sugestoes.append("- Timing de carboidratos em janelas pré e pós-treino.")
+        pdf.ln(5)
+
+    if not infantil.empty:
+        pdf.set_fill_color(240, 240, 240)
+        pdf.cell(0, 10, 'Avaliação Infantil', 0, 1, 'L', 1)
+        pdf.multi_cell(0, 10, f'Gestação: {infantil.iloc[0]["idade_gestacional"]}')
+        pdf.multi_cell(0, 10, f'Amamentação: {infantil.iloc[0]["amamentacao"]}')
+        pdf.multi_cell(0, 10, f'Introdução Alimentar: {infantil.iloc[0]["introducao_alimentar"]}')
+        pdf.multi_cell(0, 10, f'Objetivo Pediátrico: {infantil.iloc[0]["objetivo_infantil"]}')
+        pdf.ln(5)
+
+    if sugestoes:
+        pdf.set_fill_color(255, 255, 220)
+        pdf.cell(0, 10, 'Sugestões Estratégicas (IA Auxiliar)', 0, 1, 'L', 1)
+        for s in sugestoes:
+            pdf.multi_cell(0, 10, s)
+        pdf.ln(5)
+
+    return pdf.output()
+
+def main():
+    st.set_page_config(page_title="NutriManager Pro", page_icon="🥗", layout="wide")
+    inicializar_banco()
+    
+    st.markdown("""
+        <style>
+        .main {
+            background-color: #f8f9fa;
+        }
+        .stButton>button {
+            border-radius: 20px;
+            background-color: #28a745;
+            color: white;
+            transition: 0.3s;
+        }
+        .stButton>button:hover {
+            background-color: #218838;
+            transform: scale(1.05);
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    if os.path.exists("logo.png"):
+        st.sidebar.image("logo.png", use_container_width=True)
+    
+    st.sidebar.title("NutriManager Pro")
+    opcao = st.sidebar.radio("Navegação Principal", ["Cadastrar Paciente", "Módulo Clínico", "Módulo Esportivo", "Módulo Infantil", "Gerenciar Pacientes"])
+    
+    if opcao == "Cadastrar Paciente":
+        st.title("📄 Novo Registro")
+        with st.form("form_paciente"):
+            nome = st.text_input("Nome Completo do Paciente")
+            col1, col2 = st.columns(2)
+            idade = col1.number_input("Idade", min_value=0, max_value=120, value=25)
+            sexo = col2.selectbox("Sexo Biológico", ["Masculino", "Feminino", "Outro"])
+            peso = col1.number_input("Peso Atual (kg)", min_value=0.0, value=70.0)
+            altura = col2.number_input("Altura (m)", min_value=0.0, value=1.70)
+            
+            imc = 0.0
+            if altura > 0:
+                imc = peso / (altura ** 2)
+            
+            st.info(f"O IMC atual deste paciente é: {imc:.2f}")
+            
+            if st.form_submit_button("Confirmar Cadastro"):
+                if nome:
+                    pid = salvar_paciente(nome, idade, sexo, peso, altura, imc)
+                    st.success(f"Paciente {nome} registrado com ID #{pid}")
+                else:
+                    st.error("O campo Nome é obrigatório.")
+                    
+    elif opcao == "Gerenciar Pacientes":
+        st.title("📋 Base de Pacientes")
+        pacientes = listar_pacientes()
+        if not pacientes.empty:
+            for _, row in pacientes.iterrows():
+                with st.container(border=True):
+                    c1, c2, c3 = st.columns([3, 1, 1])
+                    c1.subheader(f"{row['nome']}")
+                    c1.write(f"ID: {row['id']} | IMC: {row['imc']:.2f}")
+                    
+                    if c2.button(f"📥 Relatório", key=f"rel_{row['id']}"):
+                        p, cl, es, inf = obter_dados_relatorio(row['id'])
+                        try:
+                            pdf_bytes = gerar_pdf(p, cl, es, inf)
+                            st.download_button(label="Baixar Agora", data=pdf_bytes, file_name=f"relatorio_{row['nome']}.pdf", mime="application/pdf")
+                        except Exception as e:
+                            st.error(f"Erro ao gerar PDF: {e}")
+                        
+                    if c3.button(f"🗑️ Excluir", key=f"excluir_{row['id']}"):
+                        excluir_paciente(row['id'])
+                        st.warning("Registro removido.")
+                        st.rerun()
+        else:
+            st.info("Nenhum registro encontrado no sistema.")
+
+    elif opcao in ["Módulo Clínico", "Módulo Esportivo", "Módulo Infantil"]:
+        pacientes = listar_pacientes()
+        if pacientes.empty:
+            st.warning("Realize primeiro o cadastro de um paciente.")
+        else:
+            paciente_selecionado = st.selectbox("Selecione o paciente para atendimento:", ["-- Selecione --"] + pacientes['nome'].tolist())
+            
+            if paciente_selecionado != "-- Selecione --":
+                pid = pacientes[pacientes['nome'] == paciente_selecionado]['id'].values[0]
+                st.divider()
+                
+                if "Clínico" in opcao:
+                    st.title("🏥 Anamnese Clínica")
+                    historico = st.text_area("Histórico Clínico e Doenças Preexistentes")
+                    alergias = st.text_area("Alergias ou Intolerâncias Alimentares")
+                    medicamentos = st.text_area("Medicamentos e Fármacos em Uso")
+                    objetivo = st.text_area("Objetivo da Intervenção Clínica")
+                    if st.button("Gravar Avaliação Clínica"):
+                        salvar_clinica(pid, historico, alergias, medicamentos, objetivo)
+                        st.success("Dados clínicos atualizados!")
+                        
+                elif "Esportivo" in opcao:
+                    st.title("🏋️ Anamnese Esportiva")
+                    esporte = st.text_input("Modalidade Praticada")
+                    frequencia = st.text_input("Intensidade/Frequência Semanal")
+                    suplementos = st.text_area("Suplementação Utilizada")
+                    objetivo = st.text_area("Objetivo de Performance/Estético")
+                    if st.button("Gravar Avaliação Esportiva"):
+                        salvar_esportiva(pid, esporte, frequencia, suplementos, objetivo)
+                        st.success("Dados esportivos atualizados!")
+                        
+                elif "Infantil" in opcao:
+                    st.title("👶 Anamnese Pediátrica")
+                    gestacao = st.text_input("Histórico Gestacional e Nascimento")
+                    amamentacao = st.text_input("Tempo de Amamentação")
+                    introducao = st.text_area("Histórico de Introdução Alimentar")
+                    objetivo = st.text_area("Objetivo Nutricional Infantil")
+                    if st.button("Gravar Avaliação Pediátrica"):
+                        salvar_infantil(pid, gestacao, amamentacao, introducao, objetivo)
+                        st.success("Dados pediátricos atualizados!")
+
+if __name__ == "__main__":
+    main()
+
