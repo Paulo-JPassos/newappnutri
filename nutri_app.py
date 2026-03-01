@@ -190,7 +190,7 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
             pdf.multi_cell(0, 10, s)
         pdf.ln(5)
 
-    return pdf.output()
+    return bytes(pdf.output())
 
 def main():
     st.set_page_config(page_title="NutriManager Pro", page_icon="🥗", layout="wide")
