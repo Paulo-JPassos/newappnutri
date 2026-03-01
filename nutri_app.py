@@ -153,25 +153,52 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
         pdf.multi_cell(0, 10, f'Alergias: {clinica.iloc[0]["alergias"]}')
         pdf.multi_cell(0, 10, f'Medicamentos: {clinica.iloc[0]["medicamentos"]}')
         pdf.multi_cell(0, 10, f'Objetivo: {clinica.iloc[0]["objetivo_clinico"]}')
-        pdf.ln(5)
         
+        # IA Clínica
+        sug_cli = []
         obj = str(clinica.iloc[0]["objetivo_clinico"]).lower()
-        if 'emagrec' in obj or 'perder peso' in obj:
-            sugestoes.append("- Foco em déficit calórico controlado e aumento de ingestão de fibras.")
+        hist = str(clinica.iloc[0]["historico_doencas"]).lower()
+        if 'emagrec' in obj or 'perder' in obj:
+            sug_cli.append("- [IA Clínica] Foco em déficit calórico e saciedade via fibras.")
         if 'diabetes' in obj or 'glicose' in obj:
-            sugestoes.append("- Controle rigoroso de carga glicêmica e monitoramento de carboidratos complexos.")
+            sug_cli.append("- [IA Clínica] Controle de carga glicêmica em todas as refeições.")
+        if 'cansaço' in hist or 'fadiga' in hist:
+            sug_cli.append("- [IA Clínica] Avaliar deficiência de B12/Ferro e aporte hídrico.")
+        
+        if sug_cli:
+            pdf.set_font('helvetica', 'I', 10)
+            pdf.set_text_color(40, 40, 150)
+            for s in sug_cli:
+                pdf.multi_cell(0, 7, s)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('helvetica', '', 12)
+        pdf.ln(5)
 
     if not esportiva.empty:
         pdf.set_fill_color(240, 240, 240)
         pdf.cell(0, 10, 'Avaliação Esportiva', 0, 1, 'L', 1)
         pdf.multi_cell(0, 10, f'Atividade: {esportiva.iloc[0]["esporte"]} ({esportiva.iloc[0]["frequencia"]})')
         pdf.multi_cell(0, 10, f'Suplementação: {esportiva.iloc[0]["suplementos"]}')
-        pdf.multi_cell(0, 10, f'Objetivo Esportivo: {esportiva.iloc[0]["objetivo_esportivo"]}')
+        pdf.multi_cell(0, 10, f'Objetivo: {esportiva.iloc[0]["objetivo_esportivo"]}')
         
+        # IA Esportiva
+        sug_esp = []
         obj_e = str(esportiva.iloc[0]["objetivo_esportivo"]).lower()
-        if 'hipertrofia' in obj_e or 'ganho de massa' in obj_e:
-            sugestoes.append("- Otimizar aporte proteico distribuído ao longo do dia (2.0g/kg+).")
-            sugestoes.append("- Timing de carboidratos em janelas pré e pós-treino.")
+        sup = str(esportiva.iloc[0]["suplementos"]).lower()
+        if 'hipertrofia' in obj_e or 'massa' in obj_e:
+            sug_esp.append("- [IA Esportiva] Proteína ideal: 2.0-2.2g/kg distribuída em 4-5 doses.")
+            if 'creatina' not in sup:
+                sug_esp.append("- [IA Esportiva] Info: Avaliar introdução de Creatina para performance.")
+        if 'performance' in obj_e or 'rendimento' in obj_e:
+            sug_esp.append("- [IA Esportiva] Periodização de carboidratos conforme carga de treino.")
+            
+        if sug_esp:
+            pdf.set_font('helvetica', 'I', 10)
+            pdf.set_text_color(40, 110, 40)
+            for s in sug_esp:
+                pdf.multi_cell(0, 7, s)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('helvetica', '', 12)
         pdf.ln(5)
 
     if not infantil.empty:
@@ -180,20 +207,47 @@ def gerar_pdf(paciente, clinica, esportiva, infantil):
         pdf.multi_cell(0, 10, f'Gestação: {infantil.iloc[0]["idade_gestacional"]}')
         pdf.multi_cell(0, 10, f'Amamentação: {infantil.iloc[0]["amamentacao"]}')
         pdf.multi_cell(0, 10, f'Introdução Alimentar: {infantil.iloc[0]["introducao_alimentar"]}')
-        pdf.multi_cell(0, 10, f'Objetivo Pediátrico: {infantil.iloc[0]["objetivo_infantil"]}')
-        pdf.ln(5)
+        pdf.multi_cell(0, 10, f'Objetivo: {infantil.iloc[0]["objetivo_infantil"]}')
+        
+        # IA Infantil
+        sug_inf = []
+        obj_i = str(infantil.iloc[0]["objetivo_infantil"]).lower()
+        if 'introdução' in obj_i or 'comer' in obj_i:
+            sug_inf.append("- [IA Infantil] Estímulo sensorial: variedade de cores e texturas naturais.")
+        if 'crescer' in obj_i or 'peso' in obj_i:
+            sug_inf.append("- [IA Infantil] Atenção ao aporte de micronutrientes e gorduras saudáveis.")
 
-    if sugestoes:
-        pdf.set_fill_color(255, 255, 220)
-        pdf.cell(0, 10, 'Sugestões Estratégicas (IA Auxiliar)', 0, 1, 'L', 1)
-        for s in sugestoes:
-            pdf.multi_cell(0, 10, s)
+        if sug_inf:
+            pdf.set_font('helvetica', 'I', 10)
+            pdf.set_text_color(150, 40, 40)
+            for s in sug_inf:
+                pdf.multi_cell(0, 7, s)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_font('helvetica', '', 12)
         pdf.ln(5)
 
     return bytes(pdf.output())
 
+def remover_duplicatas():
+    conexao = sqlite3.connect('nutricao.db')
+    cursor = conexao.cursor()
+    
+    cursor.execute('''
+        DELETE FROM pacientes 
+        WHERE id NOT IN (
+            SELECT MIN(id) 
+            FROM pacientes 
+            GROUP BY nome
+        )
+    ''')
+    
+    removidos = cursor.rowcount
+    conexao.commit()
+    conexao.close()
+    return removidos
+
 def main():
-    st.set_page_config(page_title="NutriManager Pro", page_icon="🥗", layout="wide")
+    st.set_page_config(page_title="Desenvolverdura Pro", page_icon="🥗", layout="wide")
     inicializar_banco()
     
     st.markdown("""
@@ -217,7 +271,7 @@ def main():
     if os.path.exists("logo.png"):
         st.sidebar.image("logo.png", use_container_width=True)
     
-    st.sidebar.title("NutriManager Pro")
+    st.sidebar.title("Desenvolverdura Pro")
     opcao = st.sidebar.radio("Navegação Principal", ["Cadastrar Paciente", "Módulo Clínico", "Módulo Esportivo", "Módulo Infantil", "Gerenciar Pacientes"])
     
     if opcao == "Cadastrar Paciente":
@@ -245,6 +299,14 @@ def main():
                     
     elif opcao == "Gerenciar Pacientes":
         st.title("📋 Base de Pacientes")
+        
+        if st.button("🧹 Limpar Pacientes Duplicados"):
+            qtd = remover_duplicatas()
+            st.success(f"Limpeza concluída! {qtd} registros duplicados removidos.")
+            st.rerun()
+
+        st.divider()
+        
         pacientes = listar_pacientes()
         if not pacientes.empty:
             for _, row in pacientes.iterrows():
